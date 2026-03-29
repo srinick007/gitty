@@ -91,11 +91,12 @@ class Tree(Git_objects):
                 else:
                     file_path = Tree.repo_path / value[1]
                 rel_path = file_path.relative_to(Tree.repo_path).as_posix()
-                commit_index[rel_path] =  read_from_blob(key)[1].split("\n")
+                commit_index[rel_path] =  {'hash':key}
         return commit_index
     
 
 class Commit(Git_objects):
+    # TODO: add commit time
     def __init__(self,tree_hash,parent_hash,message,author):
         lines = [f"tree {tree_hash}"]
         if parent_hash and parent_hash != 'None':
@@ -108,6 +109,7 @@ class Commit(Git_objects):
 
         super().__init__("Commit",formatted_body)       
 
+    # overriding the current workspace with the checking out workspace (can also be used for reset commands)
     @staticmethod
     def commit_content(commit_hash):
         with open(Commit.index_file_path,'r') as file:

@@ -4,7 +4,8 @@ import time
 import sys
 # sys.path.append(str(Path(__file__).parent.resolve()))
 
-from git_objects import Blob
+from colors import bcolors 
+from git_objects import Blob, Tree
 from utils import get_file_from_commit, get_parent_hash, read_from_blob
 
 
@@ -40,7 +41,12 @@ class Index:
         with open(self.index_file_path,'w') as f:
             json.dump(d,f)
 
+    # TODO: all make the status tell which files are in index but not commited yet
     def status(self):
+        print(bcolors.BOLD + "changes to be commited" + bcolors.ENDC)
+        self.status_index_and_commit()
+
+        print(bcolors.BOLD + "changes to be stages" + bcolors.ENDC)
         with open(self.index_file_path) as f:
             d = json.load(f)
         for file in self.repo_path.rglob("*") :
@@ -50,20 +56,43 @@ class Index:
                     file = Path(file).resolve()
                     rel_key = file.relative_to(self.repo_path).as_posix()
                     if rel_key not in d:
-                        print("untracked files: ", file.relative_to(self.repo_path).as_posix())
+                        print(bcolors.BLUE + "untracked files: ", file.relative_to(self.repo_path).as_posix() + 
+                                                                                                        bcolors.BLUE)
                     # modified file
                     else:
                         index_file = d[rel_key]
                         file_stat = file.stat()
-                        if index_file['mt_time'] != time.ctime(file_stat.st_mtime) :
+                        if index_file['mt_time'] != time.ctime(file_stat.st_mtime):
                             if index_file['hash'] != Blob.read_and_hash_blob(file):
-                                print("modified file: ",file.relative_to(self.repo_path).as_posix())
+                                print(bcolors.GREEN + "modified file: ",file.relative_to(self.repo_path).as_posix() + 
+                                                                                                            bcolors.ENDC)
                         del d[rel_key]
             
         # deleted files
         if len(d)>0:
             for key in d.keys():
-                print("deleted files: ", key)
+                print(bcolors.RED + "deleted files: ", key + bcolors.ENDC)
+
+    def status_index_and_commit(self):
+        commit_hash = get_parent_hash()
+        root_tree = read_from_blob(commit_hash)[1].split('\n')[0].split(" ")[1]
+        commit_index = Tree.construct_tree_from_root_tree(root_tree)
+        
+        with open(self.index_file_path,'r') as file:
+            index = json.load(file)
+
+        for key,value in index.items():
+            if key in commit_index:
+                if value['hash'] != commit_index[key]['hash']:
+                    print(bcolors.GREEN + f" modified file: {key}" + bcolors.ENDC)
+                del commit_index[key]
+            elif key not in commit_index:
+                print(bcolors.GREEN + f"added file: {key}" + bcolors.ENDC)
+                del commit_index[key]
+
+        print("\n")
+        for key in commit_index.keys():
+            print(bcolors.RED + f"deleted file: {key}" + bcolors.ENDC)
 
     @staticmethod                    
     def construct_tree_from_json(index_file_path):

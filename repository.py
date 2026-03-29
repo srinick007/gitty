@@ -2,8 +2,10 @@ import json
 import sys
 from pathlib import Path
 from difflib import unified_diff
+import time
 
 # sys.path.append(str(Path(__file__).parent.resolve()))
+from colors import bcolors
 from git_objects import Tree,Commit
 from index import Index
 from utils import get_parent_hash, read_from_blob
@@ -85,7 +87,7 @@ class Repository:
         commit_hash = get_parent_hash()
 
         while commit_hash:
-            print("commit_hash: ",commit_hash)
+            print('\033[94m'+"commit_hash: ",commit_hash+'\033[0m')
             commit_content = read_from_blob(commit_hash)[1].split('\n')
             commit_hash = None
             for i in commit_content[1:]:
@@ -103,7 +105,8 @@ class Repository:
                 print("""
                         |
                         v """)
-            
+        
+    # TODO: make the print statements meaning full and prettier
     def diff(self,flag):
         if flag == 'head':
             with open(self.index_file_path,'r') as f:
@@ -114,7 +117,7 @@ class Repository:
             commit_index = Tree.construct_tree_from_root_tree(root_tree)
             for key,value in commit_index.items():
                 file = self.repo_path / key
-                a_data = value
+                a_data = read_from_blob(value['hash'])[1].split("\n")
                 if file.exists():
                     with open(file,'r') as f:
                         content = f.read()
@@ -134,7 +137,7 @@ class Repository:
             commit_index = Tree.construct_tree_from_root_tree(root_tree)
             # print(commit_index)
             for key,value in commit_index.items():
-                a_data = value
+                a_data = read_from_blob(value['hash'])[1].split("\n")
                 if key in index:
                     header,data = read_from_blob(index[key]['hash'])
                     b_data = data.split("\n")
@@ -209,6 +212,67 @@ class Repository:
         diff = unified_diff(a, b, lineterm='')
         print('\n'.join(list(diff)))
 
+    @staticmethod
+    def get_previous_commit_hash(command):
+        commit_hash = get_parent_hash()
+        commit_content = read_from_blob(commit_hash)[1].split('\n')
+        print("current hash: ", commit_hash)
+        for previous_commit in range(int(command.split('~')[1])):
+            commit_parent = None
+            for i in commit_content[1:]:
+                if i == "":
+                    continue
+                content = i.split(" ")
+                if content[0] == "parent":
+                    commit_parent = content[1]
+            if commit_parent:
+                commit_content = read_from_blob(commit_parent)[1].split('\n')
+            else:
+                print(bcolors.RED + "not enough parent commit to go back" + bcolors.ENDC)
+                return
+        print(bcolors.CYAN + F"parent hash: {commit_parent}" + bcolors.ENDC)
+        return commit_parent
+    
+    # TODO: create the commit reset functionality
+    def soft_reset(self,command):
+        commit_parent_hash = Repository.get_previous_commit_hash(command)
+        if commit_parent_hash == None:
+            return
+        self.update_head(commit_parent_hash)
+    
+    def mixed_rest(self,command):
+        commit_parent_hash = Repository.get_previous_commit_hash(command)
+        if commit_parent_hash == None:
+            return
+        root_tree = read_from_blob(commit_parent_hash)[1].split('\n')[0].split(" ")[1]
+        commit_index = Tree.construct_tree_from_root_tree(root_tree)
+        for key,value in commit_index.items():
+            file = self.repo_path / key
+            ct_time = time.ctime(time.time())
+            if file.exists():
+                file_stat = file.stat()
+                ct_time = time.ctime(file_stat.st_ctime)
+                file_size = file_stat.st_size
+            else:
+                file_size = read_from_blob(value['hash'])[1].split(" ")[1]
+
+            commit_index[key] = {'hash':value['hash'],
+                                    'ct_time':ct_time,
+                                    'mt_time':ct_time,
+                                    'size':file_size,
+                                    'mode': "100644",
+                                    'file_name':file.name}
+
+        self.update_head(commit_parent_hash)
+        with open(self.index_file_path,'w') as f:
+            json.dump(commit_index,f)
+
+    def hard_reset(self,command):   
+        commit_parent_hash = Repository.get_previous_commit_hash(command)
+        if commit_parent_hash == None:
+            return
+        Commit.commit_content(commit_parent_hash)
+        self.update_head(commit_parent_hash)
 
 
 # repo = Repository()

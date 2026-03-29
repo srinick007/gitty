@@ -29,18 +29,26 @@ def main():
     unstage_parser.add_argument('file', type=str, help="specify a single file or '.' for all the file")
 
     diff_parser = subparsers.add_parser('diff', help="Show changes between commits, commit and working tree, etc.")
-    group = diff_parser.add_mutually_exclusive_group(required=False)
-    group.add_argument('--head', action='store_true', dest='head',
+    diff_group = diff_parser.add_mutually_exclusive_group(required=False)
+    diff_group.add_argument('--head', action='store_true', dest='head',
                             help="Diff between the latest commit (HEAD) and the local directory")
 
-    group.add_argument('--cached', action='store_true',
+    diff_group.add_argument('--cached', action='store_true',
                             help="Diff between the index (staged changes) and the latest commit")
 
-    group.add_argument('--all', action='store_true',
-                            help="Include files that are not yet tracked but have been marked with intent-to-add")
+    diff_group.add_argument('--all', action='store_true',
+                            help="Include files that are not yet tracked but have been marked with intent-to-add")    
 
     diff_parser.add_argument('files', nargs='*', help="Specific files to diff")
+    
+    reser_parser = subparsers.add_parser('reset', help="Reset current HEAD to the specified state")
+    reset_group = reser_parser.add_mutually_exclusive_group(required=False)
+    reset_group.add_argument("--soft", action="store_true", help="Resets without touching index or working tree")
+    reset_group.add_argument("--mixed", action="store_true", help="Resets index but not working tree (default)")
+    reset_group.add_argument("--hard", action="store_true", help="Resets index and working tree (all changes discarded)")
 
+    reser_parser.add_argument("commit", nargs="?", default="HEAD~1", help="The commit to reset to")
+    
     args = parser.parse_args()
     
     repo = Repository()
@@ -96,6 +104,18 @@ def main():
         else:
             print("index and local")
             repo.diff(None)
+
+    elif args.command == "reset":
+        if args.soft:
+            print("resetting soft")
+            repo.soft_reset(args.commit)
+        elif args.mixed:
+            print("resetting mixed")
+        elif args.hard:
+            print("resetting hard")
+            repo.hard_reset(args.commit)
+        else:
+            repo.mixed_rest(args.commit)
 
     else:
         parser.print_help()
