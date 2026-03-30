@@ -44,7 +44,7 @@ class Index:
     def status(self):
         print(bcolors.BOLD + "changes to be commited" + bcolors.ENDC)
         self.status_index_and_commit()
-
+        print("\n")
         print(bcolors.BOLD + "changes to be stages" + bcolors.ENDC)
         with open(self.index_file_path) as f:
             d = json.load(f)
@@ -83,13 +83,11 @@ class Index:
         for key,value in index.items():
             if key in commit_index:
                 if value['hash'] != commit_index[key]['hash']:
-                    print(bcolors.GREEN + f" modified file: {key}" + bcolors.ENDC)
+                    print(bcolors.GREEN + f"modified file: {key}" + bcolors.ENDC)
                 del commit_index[key]
             elif key not in commit_index:
                 print(bcolors.GREEN + f"added file: {key}" + bcolors.ENDC)
-                del commit_index[key]
 
-        print("\n")
         for key in commit_index.keys():
             print(bcolors.RED + f"deleted file: {key}" + bcolors.ENDC)
 
@@ -144,7 +142,8 @@ class Index:
         file_content = get_file_from_commit(root_tree,file)
         with open(self.index_file_path,'r') as f:
             d = json.load(f)
-        if file_content[0] != None:
+
+        if file_content != None:
             rel_key,file_hash = file_content
             file = Path(file)
             file_stat = file.stat()

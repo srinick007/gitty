@@ -39,6 +39,7 @@ class Repository:
         self.update_head(hash)
     
         print("all changes commited, hash: ",hash)
+        return hash
 
     def update_head(self,commit_hash):
         head_path = self.repo_path / '.git' / 'HEAD'
@@ -70,7 +71,13 @@ class Repository:
         if chech_sha1_hash(branch_name):
             head_path.write_text(branch_name)
         else:
-
+            new_branch_path = self.repo_path/ '.git' / 'refs' / 'heads' / branch_name
+            if not new_branch_path.exists():
+                print(bcolors.WARNING +
+                       f"""branch {branch_name} does not exist creating branch {branch_name} and  checking out""" + 
+                       bcolors.ENDC)
+                commit_hash = get_parent_hash()
+                new_branch_path.write_text(commit_hash)
             head_path.write_text(f'ref: refs/heads/{branch_name}')
         
         self.workspace_change()
@@ -94,7 +101,12 @@ class Repository:
         
     def log(self):
         commit_hash = get_parent_hash()
-
+        if commit_hash is None:
+            print(bcolors.RED + 
+                  "fatal: your current branch has disappeared. (Did you delete it manually?)" + 
+                  bcolors.ENDC)
+            return
+        
         while commit_hash:
             print('\033[94m'+"commit_hash: ",commit_hash+'\033[0m')
             commit_content = read_from_blob(commit_hash)[1].split('\n')
@@ -109,7 +121,7 @@ class Repository:
                 elif content[0] == "author":
                     print("author: ", content[1])
                 elif content[0] == "time":
-                    print("time", content[1])
+                    print("time", ' '.join(content[1:]))
                 else:
                     print(i)
             if commit_hash:
@@ -244,8 +256,6 @@ class Repository:
         print(bcolors.CYAN + F"parent hash: {commit_parent}" + bcolors.ENDC)
         return commit_parent
     
-    # TODO: create the commit reset functionality
-    # DONE
     def soft_reset(self,command):
         commit_parent_hash = Repository.get_previous_commit_hash(command)
         if commit_parent_hash == None:
@@ -266,7 +276,7 @@ class Repository:
                 ct_time = time.ctime(file_stat.st_ctime)
                 file_size = file_stat.st_size
             else:
-                file_size = read_from_blob(value['hash'])[1].split(" ")[1]
+                file_size = len(read_from_blob(value['hash'])[1])
 
             commit_index[key] = {'hash':value['hash'],
                                     'ct_time':ct_time,
@@ -285,7 +295,66 @@ class Repository:
             return
         Commit.commit_content(commit_parent_hash)
         self.update_head(commit_parent_hash)
+    
+    def cherry_pick(self,commit_hash,no_commit,commit_message):
+        commit_content = read_from_blob(commit_hash)[1].split('\n')
+        root_tree = commit_content[0].split(" ")[1]
+        if commit_content[1].split(" ")[0] == "parent":
+            parent_commit_hash = commit_content[1].split(" ")[1]
+            parent_commit_content = read_from_blob(parent_commit_hash)[1].split('\n')
+            parent_root_tree = parent_commit_content[0].split(" ")[1]
+            parent_commit_index = Tree.construct_tree_from_root_tree(parent_root_tree)
+        commit_index = Tree.construct_tree_from_root_tree(root_tree)
 
+        diff_index = {}
+        for key,value in commit_index.items():
+            if key in parent_commit_index:
+                if value['hash'] != parent_commit_index[key]['hash']:
+                    diff_index[key] = value
+                    diff_index[key]['modify_type'] = "add"
+                    del parent_commit_index[key]
+                else:
+                    del parent_commit_index[key]
+            elif key not in parent_commit_index:
+                diff_index[key] = value
+                diff_index[key]['modify_type'] = "add"
+        
+        for key,value in parent_commit_index.items():
+            diff_index[key] = value
+            diff_index[key]['modify_type'] = "delete"
+
+        with open(self.index_file_path,'r') as f:
+            index = json.load(f)
+
+        for key,value in diff_index.items():
+            if value['modify_type'] == "add":
+                file_size = len(read_from_blob(value['hash'])[1])
+                index[key] = {'hash':value['hash'],
+                                'ct_time':time.ctime(time.time()),
+                                'mt_time':time.ctime(time.time()),
+                                'size':file_size,
+                                'mode': "100644",
+                                'file_name': key.split("/")[-1]}
+            elif value['modify_type'] == "delete":
+                if key in index:
+                    file_path = Commit.repo_path / key
+                    file_path.unlink(missing_ok=False)
+                    parent_dir = file_path.parent
+                    result = True if (parent_dir.is_dir() and list(parent_dir.iterdir()) == []) else False
+                    if result:
+                        parent_dir.rmdir()
+                    del index[key]
+        
+        if not no_commit:
+            message = commit_message if commit_message else commit_content[-1]
+            self.commit(message)        
+            print(bcolors.GREEN + f"cherry picked from commit {commit_hash}")
+        else:
+            print(bcolors.GREEN + f"successfully cherry picked from commit {commit_hash} and applied changed to working dir")
+
+
+
+                
 
 # repo = Repository()
 # repo.commit("first commit")

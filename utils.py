@@ -7,7 +7,7 @@ import regex
 repo_path = Path.cwd().resolve()
 BLOB_PATH = repo_path/ '.git'/'objects'
 
-
+# TODO: if the branch is manually deteled handle it
 def get_parent_hash():
         head_path = repo_path / '.git' / 'HEAD'
         if not head_path.exists():
@@ -121,6 +121,6 @@ def get_file_from_commit(root_tree,file,path_list=[]):
 
 # print(get_file_from_commit('2879cd3d6634318121fa580024232843dbb0226c','sub_folder1/sub1_folder.py'))
 
-# print(read_from_blob('3431b553d5db55a536376ab075ed4198fcaab546')[1])
-# print(read_objects('0452e49af5ce13210fca557e3afb5d27901a29b3',[]))
-# print(read_from_blob('31be9cc7a8f7f6c6eb228d40979d7fdb0d96ef95'))
+# print(read_from_blob('806a29ad3ce0315e88ed4b12d041c3056c5ed9a3')[1])
+# print(read_objects('598e782b419358e7defc88a5178ba6e099f4c5a7',[]))
+# print(read_from_blob('86cba94bd0a2e67242417aad3e2b41165230975f')[1].split("\n"))

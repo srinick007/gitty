@@ -41,14 +41,21 @@ def main():
 
     diff_parser.add_argument('files', nargs='*', help="Specific files to diff")
     
-    reser_parser = subparsers.add_parser('reset', help="Reset current HEAD to the specified state")
-    reset_group = reser_parser.add_mutually_exclusive_group(required=False)
+    reset_parser = subparsers.add_parser('reset', help="Reset current HEAD to the specified state")
+    reset_group = reset_parser.add_mutually_exclusive_group(required=False)
     reset_group.add_argument("--soft", action="store_true", help="Resets without touching index or working tree")
     reset_group.add_argument("--mixed", action="store_true", help="Resets index but not working tree (default)")
     reset_group.add_argument("--hard", action="store_true", help="Resets index and working tree (all changes discarded)")
 
-    reser_parser.add_argument("commit", nargs="?", default="HEAD~1", help="The commit to reset to")
-    
+    reset_parser.add_argument("commit", nargs="?", default="HEAD~1", help="The commit to reset to")
+
+    cherry_parser= subparsers.add_parser("cherry-pick", help="""cherry pick the changes you want from a 
+                                                               particular commit and add to your current working directory""")    
+    cherry_group = cherry_parser.add_mutually_exclusive_group(required=False)
+    cherry_group.add_argument("--no-commit", action='store_true', help="dont commit the changes just change the working dir")
+    cherry_group.add_argument('-e', type=str, help="cherry pick commit message")
+    cherry_parser.add_argument("commit_hash", type=str, help="commit hash of the commit you want changes from")
+
     args = parser.parse_args()
     
     repo = Repository()
@@ -62,7 +69,6 @@ def main():
         repo.commit(args.message)
 
     elif args.command == "status":
-        print("status: ")
         index.status()
     
     elif args.command == "add":
@@ -117,6 +123,9 @@ def main():
         else:
             repo.mixed_rest(args.commit)
 
+    elif args.command == "cherry-pick":
+        repo.cherry_pick(args.commit_hash,args.no_commit,args.e)
+    
     else:
         parser.print_help()
 
