@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import zlib
+import regex
 
 repo_path = Path.cwd().resolve()
 BLOB_PATH = repo_path/ '.git'/'objects'
@@ -13,7 +14,7 @@ def get_parent_hash():
             return None
         
         content = head_path.read_text().strip()
-        
+
         if content.startswith('ref:'):
             ref_path = repo_path / '.git' / content.split(' ')[1]
             if ref_path.exists():
@@ -22,6 +23,12 @@ def get_parent_hash():
         
         return content
 
+def chech_sha1_hash(string):
+    pattern = regex.compile(r'^[a-fA-F0-9]{40}$')
+    if regex.match(pattern, string):
+        return True
+    return False
+    
 def dic_to_json(dic):
     serialized_dict = json.dumps(dic, sort_keys=True, ensure_ascii=True).encode()
     header = f"Tree {len(serialized_dict)}".encode() + b'\x00'

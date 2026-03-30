@@ -96,12 +96,12 @@ class Tree(Git_objects):
     
 
 class Commit(Git_objects):
-    # TODO: add commit time
     def __init__(self,tree_hash,parent_hash,message,author):
         lines = [f"tree {tree_hash}"]
         if parent_hash and parent_hash != 'None':
             lines.append(f"parent {parent_hash}")
         lines.append(f"author {author}")
+        lines.append(f"time {time.ctime(time.time())}")
         lines.append("") 
         lines.append(message)
 

@@ -41,7 +41,6 @@ class Index:
         with open(self.index_file_path,'w') as f:
             json.dump(d,f)
 
-    # TODO: all make the status tell which files are in index but not commited yet
     def status(self):
         print(bcolors.BOLD + "changes to be commited" + bcolors.ENDC)
         self.status_index_and_commit()

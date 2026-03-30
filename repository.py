@@ -8,7 +8,7 @@ import time
 from colors import bcolors
 from git_objects import Tree,Commit
 from index import Index
-from utils import get_parent_hash, read_from_blob
+from utils import chech_sha1_hash, get_parent_hash, read_from_blob
 
 
 class Repository:
@@ -30,7 +30,6 @@ class Repository:
         # creating the tree objects
         root_tree_hash = Tree.construct_from_unflattened(tree)
         parent_hash  = get_parent_hash()
-
         commit = Commit(tree_hash=root_tree_hash,
                         parent_hash=parent_hash,
                         message=commit_msg,
@@ -48,6 +47,8 @@ class Repository:
             ref_path = self.repo_path / '.git' / content.split(' ')[1]
             ref_path.parent.mkdir(parents=True, exist_ok=True)
             ref_path.write_text(commit_hash)
+        else:
+            head_path.write_text(commit_hash)
     
     def create_branch(self,branch_name):
         parent_hash = get_parent_hash()      
@@ -65,8 +66,12 @@ class Repository:
 
     def branch_checkout(self,branch_name):
         head_path = self.repo_path / '.git' / 'HEAD'
-        with open(head_path,'w') as file:
-            file.write(f'ref: refs/heads/{branch_name}')
+
+        if chech_sha1_hash(branch_name):
+            head_path.write_text(branch_name)
+        else:
+
+            head_path.write_text(f'ref: refs/heads/{branch_name}')
         
         self.workspace_change()
         
@@ -81,6 +86,10 @@ class Repository:
         with open(head_path,'r') as file:
             content = file.read()
         
+        if chech_sha1_hash(content):
+            print(bcolors.BOLD + f"deteched head: {content}" + bcolors.ENDC)
+            return
+
         print(content.split(' ')[1].split('/')[-1])
         
     def log(self):
@@ -99,6 +108,8 @@ class Repository:
                     print("parent: " ,content[1])
                 elif content[0] == "author":
                     print("author: ", content[1])
+                elif content[0] == "time":
+                    print("time", content[1])
                 else:
                     print(i)
             if commit_hash:
@@ -234,6 +245,7 @@ class Repository:
         return commit_parent
     
     # TODO: create the commit reset functionality
+    # DONE
     def soft_reset(self,command):
         commit_parent_hash = Repository.get_previous_commit_hash(command)
         if commit_parent_hash == None:
