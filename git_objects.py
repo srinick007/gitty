@@ -3,16 +3,18 @@ import json
 from pathlib import Path
 import time
 import zlib
-from utils import read_from_blob, read_objects, write_to_file
+from utils import delete_file_and_parent_folders, read_from_blob, read_objects, write_to_file
+import sys
+sys.path.append(str(Path(__file__).parent.resolve()))
 
 class Git_objects:
     
     repo_path = Path.cwd().resolve()
-    index_file_path = repo_path / '.git' / 'index.json'
+    index_file_path = repo_path / '.gitty' / 'index.json'
     
     def __init__(self,object_type,data):
         self.repo_path = Path.cwd()
-        self.BLOB_PATH = self.repo_path / '.git'/ 'objects'
+        self.BLOB_PATH = self.repo_path / '.gitty'/ 'objects'
         self.object_type = object_type
         self.data = data if isinstance(data,bytes) else data.encode()
         self.header = f"{self.object_type} {len(self.data)}".encode() + b"\00"
@@ -43,7 +45,7 @@ class Blob(Git_objects):
         with (self.file_path).open('r') as file:
                 content = file.read()
         super().__init__("Blob",content)
-    
+        
     @staticmethod
     def read_and_hash_blob(file_path):
         with (file_path).open('r') as file:
@@ -54,6 +56,11 @@ class Blob(Git_objects):
         hash = hashlib.sha1(full_data)
         
         return hash.hexdigest()
+
+    def read_file_content(self):
+        with (self.file_path).open('r') as file:
+            content = file.read()
+        return content
 
 class Tree(Git_objects):
     def __init__(self,dict):
@@ -75,14 +82,14 @@ class Tree(Git_objects):
         return hash_hex
     
     @staticmethod
-    def construct_tree_from_root_tree(root_tree,path_list=[]):
+    def construct_index_from_root_tree(root_tree,path_list=[]):
         commit_index = {}
         tree_header,tree_content = read_from_blob(root_tree)
         tree_content = json.loads(tree_content)
         for key,value in tree_content.items():
             if value[0] == "Tree":
                 path_list.append(value[1])
-                index = Tree.construct_tree_from_root_tree(key,path_list)
+                index = Tree.construct_index_from_root_tree(key,path_list)
                 commit_index.update(index)
                 path_list.pop()
             else:
@@ -109,70 +116,82 @@ class Commit(Git_objects):
 
         super().__init__("Commit",formatted_body)       
 
+    @staticmethod
+    def read_commit(commit_hash):
+        commit_content = read_from_blob(commit_hash)[1].split('\n')
+        commit_content_dict = {}
+        for i in commit_content:
+            if i == "":
+                continue
+            content = i.split(" ")
+            if content[0] == "parent":
+                commit_content_dict['parent'] = content[1].split(",")
+            elif content[0] == "author":
+                commit_content_dict['author'] = content[1]
+            elif content[0] == "time":
+                commit_content_dict['time'] = ' '.join(content[1:])
+            elif content[0] == "tree":
+                commit_content_dict['tree'] = content[1]
+            else:
+                commit_content_dict['message'] = i
+        return commit_content_dict
+
     # overriding the current workspace with the checking out workspace (can also be used for reset commands)
     @staticmethod
     def commit_content(commit_hash):
-        with open(Commit.index_file_path,'r') as file:
-            old_index = file.read()
-        old_index = json.loads(old_index)
+        # 1. Load the current index (what is on disk now)
+        with open(Commit.index_file_path, 'r') as file:
+            old_index = json.loads(file.read())
 
-        content = read_from_blob(commit_hash)
-        
-        # getting new branch tree object from commit message
-        content = content[1].split('\n')[0].split(' ')[1]
-        recreated_index = Commit.over_ride_contents(content,old_index)
+        # 2. Get the new tree hash from the commit blob
+        content_blob = read_from_blob(commit_hash)
+        # Adjust this index [1] if your read_from_blob returns (header, body)
+        new_tree_hash = content_blob[1].split('\n')[0].split(' ')[1]
 
-        # deleting the files that are not in checking out branch by comparing it with current branch
-        for key in old_index.keys():
-            file_path = Commit.repo_path / key
-            file_path.unlink(missing_ok=False)
-            parent_dir = file_path.parent
-            result = True if (parent_dir.is_dir() and list(parent_dir.iterdir()) == []) else False
-            if result:
-                parent_dir.rmdir()
-
-        # creates the new index
-        with open(Commit.index_file_path,'w') as file:
-            json.dump(recreated_index, file)
-        
-
-    @staticmethod
-    def over_ride_contents(root_tree,old_index,path_list=[]):
+        # 3. Build the NEW index and write files to disk
+        # We pass an empty dict for recreated_index
         recreated_index = {}
-        tree_header,tree_content = read_from_blob(root_tree)
-        tree_content = json.loads(tree_content)
-        # print(tree_content)
+        Commit.over_ride_contents(new_tree_hash, recreated_index, [])
+
+        # 4. DELETE ONLY what is not in the new index
+        # We iterate over a copy of keys to be safe
+        for old_path in list(old_index.keys()):
+            if old_path not in recreated_index:
+                file_path = Commit.repo_path / old_path
+                delete_file_and_parent_folders(file_path)
+
+        # 5. Save the new index
+        with open(Commit.index_file_path, 'w') as file:
+            json.dump(recreated_index, file, indent=4)
+            
+    @staticmethod
+    def over_ride_contents(root_tree, recreated_index, path_list):
+        tree_header, tree_content = read_from_blob(root_tree)
+        tree_data = json.loads(tree_content)
         
-        # key is hash and value is a list that mentions the type of blob and file/folder name
-        # over rides the content of the files by using the checking out branch tree object
-        for key,value in tree_content.items():
-            if value[0] == "Tree":
-                path_list.append(value[1])
-                index = Commit.over_ride_contents(key,old_index,path_list)
-                recreated_index.update(index)
-                path_list.pop()
+        for obj_hash, info in tree_data.items():
+            obj_type, obj_name = info[0], info[1]
+            
+            # Build path carefully
+            current_rel_path = "/".join(path_list + [obj_name])
+            
+            if obj_type == "Tree":
+                # Recurse
+                Commit.over_ride_contents(obj_hash, recreated_index, path_list + [obj_name])
             else:
-                if path_list:
-                    file_path = Commit.repo_path / f'{'/'.join(path_list)}/{value[1]}'
-                else:
-                    file_path = Commit.repo_path / value[1]
-                file_header,file_contents = read_from_blob(key)
-                file_size = file_header.split(" ")[1]
+                # File logic
+                full_path = Commit.repo_path / current_rel_path
+                full_path.parent.mkdir(parents=True, exist_ok=True)
                 
-                # over writing existing files/ adding new files and creating the new branch index
-                write_to_file(file_path,file_contents)
-                file_stat = file_path.stat()
-                rel_key = file_path.relative_to(Commit.repo_path).as_posix()
-                recreated_index[rel_key] = {'hash':key,
-                            'ct_time':time.ctime(file_stat.st_ctime),
-                            'mt_time':time.ctime(file_stat.st_mtime),
-                            'size':file_size,
-                            'mode': "100644",
-                            'file_name':value[1]}
-
-                # if both branches have overlap files delete the key for comparison (on which files to delete 
-                #                                                                    when changing to new branch)
-                if rel_key in old_index:
-                    del old_index[rel_key]
-
-        return recreated_index
+                h, contents = read_from_blob(obj_hash)
+                write_to_file(full_path, contents)
+                
+                stat = full_path.stat()
+                recreated_index[current_rel_path] = {
+                    'hash': obj_hash,
+                    'ct_time': time.ctime(stat.st_ctime),
+                    'mt_time': time.ctime(stat.st_mtime),
+                    'size': h.split(" ")[1],
+                    'mode': "100644",
+                    'file_name': obj_name
+                }
