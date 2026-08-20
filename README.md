@@ -8,7 +8,6 @@ Download gitty.exe from the latest GitHub Release.
 
 Add the executable directory to your system PATH, or run directly from your terminal:
 
-PowerShell
 ```
 .\gitty.exe version
 ```
@@ -16,14 +15,12 @@ PowerShell
 Option 2: Run from Source
 Clone this repository:
 
-Bash
 ```
 git clone https://github.com/your-username/gitty.git
 cd gitty
 Create a virtual environment and install dependencies:
 ```
 
-Bash
 ```
 python -m venv venv
 source venv/bin/activate 
@@ -34,13 +31,11 @@ CLI Usage Guide
 1. Configuration
 Set your author details:
 
-Bash
 ```
 gitty config --global user.name "YourName"
 ```
 
 2. Initialize a Repository
-Bash
 ```
 gitty init
 echo "Hello from Gitty" > README.md
@@ -51,14 +46,12 @@ gitty commit "Initial commit"
 4. Remote Tracking & Push
 Connect to a remote repository on the live cloud backend:
 
-Bash
 ```
 gitty remote add origin YourName/my-project
 gitty push -u origin main
 ```
 4. Branching & Checking Out
 
-Bash
 ```
 gitty branch feature-api
 gitty checkout feature-api
@@ -70,7 +63,6 @@ gitty push origin feature-api
 5. Clone a Live Repository
 Clone any public repository hosted on the live cluster:
 
-Bash
 ```
 gitty clone YourName/my-project
 cd my-project
