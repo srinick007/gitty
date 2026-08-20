@@ -4,7 +4,7 @@ Gitty has all the basic commands of Git.
 Installation:
 Option 1: Standalone Binary (Windows)
 
-Download gitty.exe from the latest GitHub Release.
+Download gitty.exe from the latest GitHub Release in <a href="https://github.com/srinick007/gitty/releases/tag/alpha_release"> GitHub Release</a>.
 
 Add the executable directory to your system PATH, or run directly from your terminal:
 
