@@ -1,6 +1,10 @@
 Gitty is lightweight content addressable version control system. the idea is inspired straight from Git, i wanted to know how Git works under the hood so i built a simpler version of it.
 Gitty has all the basic commands of Git. 
 
+
+https://github.com/user-attachments/assets/4defb3df-544c-4918-8198-a718369f8b0e
+
+
 Installation:
 Option 1: Standalone Binary (Windows)
 
@@ -68,3 +72,4 @@ gitty clone YourName/my-project
 cd my-project
 gitty branch
 ```
+<img width="720" height="640" alt="Screenshot 2026-08-20 113430" src="https://github.com/user-attachments/assets/94fd9e42-7850-4161-b3ba-926dffcaeb6b" />
