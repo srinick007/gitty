@@ -13,7 +13,7 @@ Download gitty.exe from the latest GitHub Release in <a href="https://github.com
 Add the executable directory to your system PATH, or run directly from your terminal:
 
 ```
-.\gitty.exe version
+.\gitty.exe 
 ```
 
 Option 2: Run from Source
@@ -71,5 +71,10 @@ Clone any public repository hosted on the live cluster:
 gitty clone YourName/my-project
 cd my-project
 gitty branch
+```
+
+for help
+```
+gitty -h
 ```
 <img width="720" height="640" alt="Screenshot 2026-08-20 113430" src="https://github.com/user-attachments/assets/94fd9e42-7850-4161-b3ba-926dffcaeb6b" />
